@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hello">Hello World, TestAppActivity!</string>
+    <string name="app_name">Android-Coconut-TouchDB</string>
+	<string name="main_no_items">No messages</string>
+    <string name="accounts_no_accounts">No accounts</string>
+    <string name="label_account_selector">Select account to receive notifications</string>
+    <string name="menu_accounts">Register tablet (Admins only)</string>
+    <string name="menu_accounts_description">Register phone (Admins only)</string>
+    <string name="copy_text">Copy Text</string>
+</resources>
