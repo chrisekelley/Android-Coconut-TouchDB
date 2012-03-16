@@ -19,6 +19,7 @@ import android.util.Log;
 
 import com.couchbase.touchdb.TDBody;
 import com.couchbase.touchdb.TDDatabase;
+import com.couchbase.touchdb.TDQueryOptions;
 import com.couchbase.touchdb.TDServer;
 import com.couchbase.touchdb.TDStatus;
 import com.couchbase.touchdb.TDView;
@@ -533,26 +534,11 @@ public class Router extends InstrumentationTestCase {
         server.close();
     }
     
+    
     public void testCoconut() {
 
-        TDServer server = null;
-		TDURLConnection conn;
-        String filesDir = getInstrumentation().getContext().getFilesDir().getAbsolutePath();
-        try {
-            server = new TDServer(filesDir);
-        } catch (IOException e) {
-            fail("Creating server caused IOException");
-        }
-        int limit = 16;
-        String viewQuery = "byIncidentSorted?descending=true&limit=" + limit;
-        //TDDatabase coconutDb = server.getDatabaseNamed("coconut-emas");
-        //view = coconutDb.getViewNamed("byIncidentSorted");
-        String path = "/coconut-emas/_design/coconut/_view/byIncidentSorted";
-		conn = sendRequest(server, "GET", path, null, null);
-        Map<String,Object> result;
-        result = (Map<String, Object>) parseJSONResponse(conn);
-        Log.v(TAG, String.format("%s --> %d", path, conn.getResponseCode()));
-        server.close();
+    	// use tests in CoconutTests
+    	
 	}
 
 }
