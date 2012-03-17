@@ -1,7 +1,11 @@
 Android-Coconut-TouchDB
 =======================
 
-Android-Coconut-TouchDB uses [TouchDB-Android](https://github.com/couchbaselabs/TouchDB-Android) to provide [Couchapps](http://couchapp.org/page/index) on Android devices.
+Android-Coconut-TouchDB uses [TouchDB-Android](https://github.com/couchbaselabs/TouchDB-Android) 
+to provide [Couchapps](http://couchapp.org/page/index) on Android devices.
+
+An Android [APK](https://github.com/vetula/Android-Coconut-TouchDB/raw/master/Android-Coconut-TouchDB.apk) is available 
+if you'd like to test this out.
 
 Configuration
 -------------
@@ -15,7 +19,7 @@ Note that you can also change the port in this file.
 Sample Couchapp
 ---------------
 
-More information aboutthe sample couchapp is on the [Cococnut-sample](https://github.com/vetula/coconut-sample) project page.
+More information about the sample couchapp is on the [Cococnut-sample](https://github.com/vetula/coconut-sample) project page.
 
     
 Copy the database to assets
@@ -54,12 +58,18 @@ In Android-Coconut-TouchDB, edit res/raw/coconut.properties and change coconut-s
 	app_db=coconut-sample
 	couchAppInstanceUrl=coconut-sample/_design/coconut/index.html
 	
+TODO:
+------
+* Replication
+* Add all of the C2DM code from [Android-Coconut-MobileFuton](https://github.com/vetula/Android-Coconut-MobileFuton) 
+* Push MobileFuton into this build.
+	
 What else?
 -----------
 
 Take a look at [Android-Coconut-MobileFuton](https://github.com/vetula/Android-Coconut-MobileFuton), which is an Android runtime 
 for Couchapps using Mobile-Couchbase and may provide a little more background on how this works. 
-I have not yet added all of the code for C2DM into Android-Coconut-TouchDB, not have I pushed MobileFuton into this build.
+
 
 Kudos:
 -------
