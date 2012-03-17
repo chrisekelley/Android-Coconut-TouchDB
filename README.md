@@ -40,7 +40,8 @@ Ensure that you have added
 to your .couchapprc file.
 
 Push the new project to the emulator:
-    couchapp push tou
+
+	couchapp push tou
 
 Pushing to the emulator is very slow. Using couchapp -v, watching logcat, or having some coffee can help. 
 You also may be able to push to a device instead of the emulator.
