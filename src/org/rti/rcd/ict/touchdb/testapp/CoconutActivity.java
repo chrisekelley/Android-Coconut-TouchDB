@@ -3,6 +3,9 @@ package org.rti.rcd.ict.touchdb.testapp;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.Properties;
 
 import org.rti.rcd.ict.lgug.utils.CoconutUtils;
@@ -48,12 +51,17 @@ public class CoconutActivity extends Activity {
     private ProgressDialog installProgress;
     static Handler myHandler;
     private String couchAppUrl;
+    // setup clock
+    Calendar cal = null;
+    Date starttime = null;
+    long long_starttime = 0;
 
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         //String couchAppUrl = "/";
+        //stopwatch_start();
         String filesDir = getFilesDir().getAbsolutePath();
 		
 	    Properties properties = new Properties();
@@ -132,9 +140,20 @@ public class CoconutActivity extends Activity {
 
 				if(progress == 100 && progressDialog.isShowing()) {
 					Log.d(TAG, "Progress: DONE! " + progress);
+					 // Stop clock and calculate time elapsed
+			        //stopwatchFinish();
 					progressDialog.dismiss();
 				}
             }
+
+			public void stopwatchFinish() {
+				Calendar cal2 = new GregorianCalendar();
+				Date endtime = cal2.getTime();
+				long long_endtime = endtime.getTime();
+				long difference = (long_endtime - long_starttime);
+				float diffSecs = difference / 1000;
+				Log.v(TAG,"********  Time to open app: " + difference + " or " + diffSecs + " seconds ******");
+			}
         });
 		webView.setWebViewClient(new CustomWebViewClient());		
 		webView.getSettings().setJavaScriptEnabled(true);
@@ -158,7 +177,7 @@ public class CoconutActivity extends Activity {
 	            return false;
 	        }
 	    });
-        //setContentView(R.layout.main);
+        setContentView(R.layout.main);
 		setContentView(webView);
     	String appDb = properties.getProperty("app_db");
 	    File destination = new File(filesDir + File.separator + appDb + ".touchdb");
@@ -195,15 +214,21 @@ public class CoconutActivity extends Activity {
 	    }
     }
 
+	public void stopwatch_start() {
+		cal = new GregorianCalendar();
+		starttime = cal.getTime();
+        long_starttime = starttime.getTime();
+    	Log.v(TAG, "Start page view" + starttime.toString());
+	}
+
 	private void loadWebview() {
 		String status = listener.getStatus();
 		Log.d(TAG, "Server status:" + status);
 		Log.d(TAG, "webView.loadUrl: " + couchAppUrl);
 		webView.loadUrl(this.getCouchAppUrl());
+
 	}
 
-	
-    
 	private class CustomWebViewClient extends WebViewClient {
 		@Override
 		public boolean shouldOverrideUrlLoading(WebView view, String url) {

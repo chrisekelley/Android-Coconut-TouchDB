@@ -11,7 +11,7 @@ Configuration
 -------------
 
 Clone [TouchDB-Android](https://github.com/vetula/TouchDB-Android), which is my fork of [TouchDB-Android](https://github.com/couchbaselabs/TouchDB-Android).
-My fork implements [do_POST_DesignDocument ](https://github.com/couchbaselabs/TouchDB-Android/pull/9) which is used to view incident details. 
+My fork follows closely the official version pretty closely. If you already have the couchbaselabs version, it should work fine.
 
 Using your own Couchapp
 ------------------------
@@ -42,6 +42,11 @@ to your .couchapprc file.
 Push the new project to the emulator:
 
 	couchapp push tou
+	
+Another way of doing this:
+
+     adb forward tcp:8990 tcp:8888   
+     couchapp push . http://localhost:8990/couchabb	
 
 Pushing to the emulator is very slow. Using couchapp -v, watching logcat, or having some coffee can help. 
 You also may be able to push to a device instead of the emulator.

@@ -339,6 +339,11 @@ public class CoconutUtils extends Activity {
     	} 
     } 
     
+    /**
+     * Uses private Router.send method.
+     * @param server
+     * @return
+     */
     private String createTestDatabase(TDServer server) {
 		//to ensure this test is easily repeatable we will explicitly remove
 		//any stale foo.touchdb

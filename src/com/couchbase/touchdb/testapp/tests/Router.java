@@ -19,7 +19,6 @@ import android.util.Log;
 
 import com.couchbase.touchdb.TDBody;
 import com.couchbase.touchdb.TDDatabase;
-import com.couchbase.touchdb.TDQueryOptions;
 import com.couchbase.touchdb.TDServer;
 import com.couchbase.touchdb.TDStatus;
 import com.couchbase.touchdb.TDView;
@@ -28,12 +27,14 @@ import com.couchbase.touchdb.TDViewMapEmitBlock;
 import com.couchbase.touchdb.router.TDRouter;
 import com.couchbase.touchdb.router.TDURLConnection;
 import com.couchbase.touchdb.router.TDURLStreamHandlerFactory;
-import com.couchbase.touchdb.support.DirUtils;
+import com.couchbase.touchdb.support.FileDirUtils;
 
 public class Router extends InstrumentationTestCase {
     private static boolean initializedUrlHandler = false;
 
     public static final String TAG = "Router";
+
+    private static ObjectMapper mapper = new ObjectMapper();
 
     protected String getServerPath() {
         String filesDir = getInstrumentation().getContext().getFilesDir().getAbsolutePath() + "/tests";
@@ -46,17 +47,17 @@ public class Router extends InstrumentationTestCase {
         //delete and recreate the server path
         String serverPath = getServerPath();
         File serverPathFile = new File(serverPath);
-        DirUtils.deleteRecursive(serverPathFile);
+        FileDirUtils.deleteRecursive(serverPathFile);
         serverPathFile.mkdir();
 
         //for some reason a traditional static initializer causes junit to die
         if(!initializedUrlHandler) {
-            URL.setURLStreamHandlerFactory(new TDURLStreamHandlerFactory());
+            TDURLStreamHandlerFactory.registerSelfIgnoreError();
             initializedUrlHandler = true;
         }
     }
 
-    static TDURLConnection sendRequest(TDServer server, String method, String path, Map<String,String> headers, Object bodyObj) {
+    protected static TDURLConnection sendRequest(TDServer server, String method, String path, Map<String,String> headers, Object bodyObj) {
         try {
             URL url = new URL("touchdb://" + path);
             TDURLConnection conn = (TDURLConnection)url.openConnection();
@@ -70,10 +71,8 @@ public class Router extends InstrumentationTestCase {
             Map<String, List<String>> allProperties = conn.getRequestProperties();
             if(bodyObj != null) {
                 conn.setDoInput(true);
-                ObjectMapper mapper = new ObjectMapper();
                 OutputStream os = conn.getOutputStream();
                 os.write(mapper.writeValueAsBytes(bodyObj));
-            	Log.v(TAG, "sendRequest - bodyObj: " + bodyObj);
             }
 
             TDRouter router = new TDRouter(server, conn);
@@ -87,7 +86,7 @@ public class Router extends InstrumentationTestCase {
         return null;
     }
 
-    static Object parseJSONResponse(TDURLConnection conn) {
+    protected static Object parseJSONResponse(TDURLConnection conn) {
         Object result = null;
         TDBody responseBody = conn.getResponseBody();
         if(responseBody != null) {
@@ -95,7 +94,6 @@ public class Router extends InstrumentationTestCase {
             String jsonString = null;
             if(json != null) {
                 jsonString = new String(json);
-                ObjectMapper mapper = new ObjectMapper();
                 try {
                     result = mapper.readValue(jsonString, Object.class);
                 } catch (Exception e) {
@@ -107,11 +105,9 @@ public class Router extends InstrumentationTestCase {
     }
 
     public static Object sendBody(TDServer server, String method, String path, Object bodyObj, int expectedStatus, Object expectedResult) {
-        Log.v(TAG, "bodyObj --> " + bodyObj);
         TDURLConnection conn = sendRequest(server, method, path, null, bodyObj);
         Object result = parseJSONResponse(conn);
         Log.v(TAG, String.format("%s %s --> %d", method, path, conn.getResponseCode()));
-        Log.v(TAG, "result --> " + result);
         Assert.assertEquals(expectedStatus, conn.getResponseCode());
         if(expectedResult != null) {
             Assert.assertEquals(expectedResult, result);
@@ -137,6 +133,16 @@ public class Router extends InstrumentationTestCase {
         responseBody.put("couchdb", "Welcome");
         responseBody.put("version", TDRouter.getVersionString());
         send(server, "GET", "/", TDStatus.OK, responseBody);
+
+        Map<String,Object> session = new HashMap<String,Object>();
+        Map<String,Object> userCtx = new HashMap<String,Object>();
+        List<String> roles = new ArrayList<String>();
+        roles.add("_admin");
+        session.put("ok", true);
+        userCtx.put("name", null);
+        userCtx.put("roles", roles);
+        session.put("userCtx", userCtx);
+        send(server, "GET", "/_session", TDStatus.OK, session);
 
         List<String> allDbs = new ArrayList<String>();
         send(server, "GET", "/_all_dbs", TDStatus.OK, allDbs);
@@ -307,27 +313,6 @@ public class Router extends InstrumentationTestCase {
         results.remove(result1);
         expectedChanges.put("results", results);
         send(server, "GET", "/db/_changes?since=5", TDStatus.OK, expectedChanges);
-        
-        //$ curl -d '{"docs":[{"key":"baz","name":"bazzel"},{"key":"bar","name":"barry"}]}' -X POST $DB/_bulk_docs
-        Map<String,Object> bulk_doc1 = new HashMap<String,Object>();
-        bulk_doc1.put("_id", "bulk_message1");
-        bulk_doc1.put("baz", "hello");
-        Map<String,Object> bulk_doc2 = new HashMap<String,Object>();
-        bulk_doc2.put("_id", "bulk_message2");
-        bulk_doc2.put("baz", "hi");
-        List<Map<String,Object>> list = new ArrayList<Map<String,Object>>();
-        list.add(bulk_doc1);
-        list.add(bulk_doc2);
-        Map<String,Object> bodyObj = new HashMap<String,Object>();
-        bodyObj.put("docs", list);
-        //String json = "{\"docs\":[{\"key\":\"baz\",\"name\":\"bazzel\"},{\"key\":\"bar\",\"name\":\"barry\"}]}";
-        Log.v(TAG, "About to do _bulk_docs");
-        //Map<String,Object> bulk_result =
-        List<Map<String,Object>> bulk_result  = (ArrayList<Map<String,Object>>)sendBody(server, "POST", "/db/_bulk_docs", bodyObj, TDStatus.CREATED, null);
-        //revID = (String)bulk_result.get("rev");
-        Log.v(TAG, String.format("POST returned %s", bulk_result));
-
-        //Assert.assertTrue(revID.startsWith("1-"));
 
         server.close();
     }
@@ -533,12 +518,176 @@ public class Router extends InstrumentationTestCase {
 
         server.close();
     }
-    
-    
-    public void testCoconut() {
 
-    	// use tests in CoconutTests
-    	
-	}
+    public void testPostBulkDocs() {
+
+        TDServer server = null;
+        try {
+            server = new TDServer(getServerPath());
+        } catch (IOException e) {
+            fail("Creating server caused IOException");
+        }
+
+        send(server, "PUT", "/db", TDStatus.CREATED, null);
+
+        Map<String,Object> bulk_doc1 = new HashMap<String,Object>();
+        bulk_doc1.put("_id", "bulk_message1");
+        bulk_doc1.put("baz", "hello");
+
+        Map<String,Object> bulk_doc2 = new HashMap<String,Object>();
+        bulk_doc2.put("_id", "bulk_message2");
+        bulk_doc2.put("baz", "hi");
+
+        List<Map<String,Object>> list = new ArrayList<Map<String,Object>>();
+        list.add(bulk_doc1);
+        list.add(bulk_doc2);
+
+        Map<String,Object> bodyObj = new HashMap<String,Object>();
+        bodyObj.put("docs", list);
+
+        List<Map<String,Object>> bulk_result  =
+                (ArrayList<Map<String,Object>>)sendBody(server, "POST", "/db/_bulk_docs", bodyObj, TDStatus.CREATED, null);
+
+        Assert.assertEquals(2, bulk_result.size());
+        Assert.assertEquals(bulk_result.get(0).get("id"),  bulk_doc1.get("_id"));
+        Assert.assertNotNull(bulk_result.get(0).get("rev"));
+        Assert.assertEquals(bulk_result.get(1).get("id"),  bulk_doc2.get("_id"));
+        Assert.assertNotNull(bulk_result.get(1).get("rev"));
+
+        server.close();
+
+    }
+
+    public void testPostKeysView() {
+
+    	TDServer server = null;
+    	try {
+    		server = new TDServer(getServerPath());
+    	} catch (IOException e) {
+    		fail("Creating server caused IOException");
+    	}
+
+    	send(server, "PUT", "/db", TDStatus.CREATED, null);
+
+    	Map<String,Object> result;
+
+    	TDDatabase db = server.getDatabaseNamed("db");
+    	TDView view = db.getViewNamed("design/view");
+    	view.setMapReduceBlocks(new TDViewMapBlock() {
+
+    		@Override
+    		public void map(Map<String, Object> document, TDViewMapEmitBlock emitter) {
+    			emitter.emit(document.get("message"), null);
+    		}
+    	}, null, "1");
+
+    	Map<String,Object> key_doc1 = new HashMap<String,Object>();
+    	key_doc1.put("parentId", "12345");
+    	result = (Map<String,Object>)sendBody(server, "PUT", "/db/key_doc1", key_doc1, TDStatus.CREATED, null);
+    	view = db.getViewNamed("design/view");
+    	view.setMapReduceBlocks(new TDViewMapBlock() {
+    		@Override
+    		public void map(Map<String, Object> document, TDViewMapEmitBlock emitter) {
+    			if (document.get("parentId").equals("12345")) {
+    				emitter.emit(document.get("parentId"), document);
+    			}
+    		}
+    	}, null, "1");
+
+    	List<Object> keys = new ArrayList<Object>();
+    	keys.add("12345");
+    	Map<String,Object> bodyObj = new HashMap<String,Object>();
+    	bodyObj.put("keys", keys);
+        TDURLConnection conn = sendRequest(server, "POST", "/db/_design/design/_view/view", null, bodyObj);
+        result = (Map<String, Object>) parseJSONResponse(conn);
+    	Assert.assertEquals(1, result.get("total_rows"));
+    	server.close();
+    }
+
+    public void testRevsDiff() {
+
+        TDServer server = null;
+        try {
+            server = new TDServer(getServerPath());
+        } catch (IOException e) {
+            fail("Creating server caused IOException");
+        }
+
+        send(server, "PUT", "/db", TDStatus.CREATED, null);
+
+        Map<String,Object> doc = new HashMap<String,Object>();
+        Map<String,Object> doc1r1 = (Map<String,Object>)sendBody(server, "PUT", "/db/11111", doc, TDStatus.CREATED, null);
+        String doc1r1ID = (String)doc1r1.get("rev");
+
+        Map<String,Object> doc2r1 = (Map<String,Object>)sendBody(server, "PUT", "/db/22222", doc, TDStatus.CREATED, null);
+        String doc2r1ID = (String)doc2r1.get("rev");
+
+        Map<String,Object> doc3r1 = (Map<String,Object>)sendBody(server, "PUT", "/db/33333", doc, TDStatus.CREATED, null);
+        String doc3r1ID = (String)doc3r1.get("rev");
+
+
+        Map<String, Object> doc1v2 = new HashMap<String, Object>();
+        doc1v2.put("_rev", doc1r1ID);
+        Map<String,Object> doc1r2 = (Map<String,Object>)sendBody(server, "PUT", "/db/11111", doc1v2, TDStatus.CREATED, null);
+        String doc1r2ID = (String)doc1r2.get("rev");
+
+        Map<String, Object> doc2v2 = new HashMap<String, Object>();
+        doc2v2.put("_rev", doc2r1ID);
+        sendBody(server, "PUT", "/db/22222", doc2v2, TDStatus.CREATED, null);
+
+        Map<String, Object> doc1v3 = new HashMap<String, Object>();
+        doc1v3.put("_rev", doc1r2ID);
+        Map<String,Object> doc1r3 = (Map<String,Object>)sendBody(server, "PUT", "/db/11111", doc1v3, TDStatus.CREATED, null);
+        String doc1r3ID = (String)doc1r1.get("rev");
+
+        //now build up the request
+        List<String> doc1Revs = new ArrayList<String>();
+        doc1Revs.add(doc1r2ID);
+        doc1Revs.add("3-foo");
+
+        List<String> doc2Revs = new ArrayList<String>();
+        doc2Revs.add(doc2r1ID);
+
+        List<String> doc3Revs = new ArrayList<String>();
+        doc3Revs.add("10-bar");
+
+        List<String> doc9Revs = new ArrayList<String>();
+        doc9Revs.add("6-six");
+
+        Map<String, Object> revsDiffRequest = new HashMap<String, Object>();
+        revsDiffRequest.put("11111", doc1Revs);
+        revsDiffRequest.put("22222", doc2Revs);
+        revsDiffRequest.put("33333", doc3Revs);
+        revsDiffRequest.put("99999", doc9Revs);
+
+        //now build up the expected response
+        List<String> doc1missing = new ArrayList<String>();
+        doc1missing.add("3-foo");
+
+        List<String> doc3missing = new ArrayList<String>();
+        doc3missing.add("10-bar");
+
+        List<String> doc9missing = new ArrayList<String>();
+        doc9missing.add("6-six");
+
+        Map<String, Object> doc1missingMap = new HashMap<String, Object>();
+        doc1missingMap.put("missing", doc1missing);
+
+        Map<String, Object> doc3missingMap = new HashMap<String, Object>();
+        doc3missingMap.put("missing", doc3missing);
+
+        Map<String, Object> doc9missingMap = new HashMap<String, Object>();
+        doc9missingMap.put("missing", doc9missing);
+
+        Map<String, Object> revsDiffResponse = new HashMap<String, Object>();
+        revsDiffResponse.put("11111", doc1missingMap);
+        revsDiffResponse.put("33333", doc3missingMap);
+        revsDiffResponse.put("99999", doc9missingMap);
+
+        sendBody(server, "POST", "/db/_revs_diff", revsDiffRequest, TDStatus.OK, revsDiffResponse);
+
+        server.close();
+
+    }
 
 }

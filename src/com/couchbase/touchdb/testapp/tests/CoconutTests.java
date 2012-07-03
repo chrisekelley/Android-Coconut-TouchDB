@@ -4,6 +4,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +18,10 @@ import com.couchbase.touchdb.TDView;
 import com.couchbase.touchdb.TDViewMapBlock;
 import com.couchbase.touchdb.TDViewMapEmitBlock;
 import com.couchbase.touchdb.javascript.TDJavaScriptViewCompiler;
+import com.couchbase.touchdb.listener.TDListener;
 import com.couchbase.touchdb.router.TDURLConnection;
 import com.couchbase.touchdb.router.TDURLStreamHandlerFactory;
-import com.couchbase.touchdb.support.DirUtils;
+import com.couchbase.touchdb.support.FileDirUtils;
 
 import android.test.InstrumentationTestCase;
 import android.util.Log;
@@ -38,7 +42,7 @@ public class CoconutTests extends InstrumentationTestCase{
         //delete and recreate the server path
         String serverPath = getServerPath();
         File serverPathFile = new File(serverPath);
-        DirUtils.deleteRecursive(serverPathFile);
+        FileDirUtils.deleteRecursive(serverPathFile);
         serverPathFile.mkdir();
 
         //for some reason a traditional static initializer causes junit to die
@@ -58,7 +62,7 @@ public class CoconutTests extends InstrumentationTestCase{
         } catch (IOException e) {
             fail("Creating server caused IOException");
         }
-        TDDatabase db = server.getDatabaseNamed("coconut-emas");
+        TDDatabase db = server.getDatabaseNamed("coconut-sample");
         TDView view = db.getViewNamed("byIncidentSorted");
         view.setMapReduceBlocks(new TDViewMapBlock() {
             @Override
@@ -71,9 +75,9 @@ public class CoconutTests extends InstrumentationTestCase{
         TDView.setCompiler(new TDJavaScriptViewCompiler());
         int limit = 16;
         String viewQuery = "byIncidentSorted?descending=true&limit=" + limit;
-        //TDDatabase coconutDb = server.getDatabaseNamed("coconut-emas");
+        //TDDatabase coconutDb = server.getDatabaseNamed("coconut-sample");
         //view = coconutDb.getViewNamed("byIncidentSorted");
-        String path = "/coconut-emas/_design/coconut/_view/byIncidentSorted";
+        String path = "/coconut-sample/_design/coconut/_view/byIncidentSorted";
 		conn = Router.sendRequest(server, "GET", path, null, null);
         Map<String,Object> result;
         result = (Map<String, Object>) Router.parseJSONResponse(conn);
@@ -82,8 +86,8 @@ public class CoconutTests extends InstrumentationTestCase{
         Map<String,Object> doc1 = new HashMap<String,Object>();
         doc1.put("parentId", "12345");
         doc1.put("pi", "day");
-        //result = (Map<String,Object>)Router.sendBody(server, "PUT", "/coconut-emas/abcdef", doc1, TDStatus.CREATED, null);
-        conn = Router.sendRequest(server, "PUT", "/coconut-emas/abcdef", null, doc1);
+        //result = (Map<String,Object>)Router.sendBody(server, "PUT", "/coconut-sample/abcdef", doc1, TDStatus.CREATED, null);
+        conn = Router.sendRequest(server, "PUT", "/coconut-sample/abcdef", null, doc1);
         result = (Map<String, Object>) Router.parseJSONResponse(conn);
         Log.v(TAG, String.format("%s --> %d", path, conn.getResponseCode()));
 
@@ -96,7 +100,7 @@ public class CoconutTests extends InstrumentationTestCase{
             	}
             }
         }, null, "1");
-        path = "/coconut-emas/_design/coconut/_view/byParentId";
+        path = "/coconut-sample/_design/coconut/_view/byParentId";
         // Specific keys:
         //TDQueryOptions options = new TDQueryOptions();
         List<Object> keys = new ArrayList<Object>();
@@ -113,4 +117,47 @@ public class CoconutTests extends InstrumentationTestCase{
         Log.v(TAG, String.format("%s --> %d", path, conn.getResponseCode()));
         server.close();
 	}
+    public void testLoadFiles() {
+    	
+    	TDServer server = null;
+    	TDURLConnection conn;
+    	String filesDir = getInstrumentation().getContext().getFilesDir().getAbsolutePath();
+    	try {
+    		server = new TDServer(filesDir);
+    	} catch (IOException e) {
+    		fail("Creating server caused IOException");
+    	}
+    	TDDatabase db = server.getDatabaseNamed("coconut-sample");
+    	TDListener listener = null;
+    	try {
+			listener = new TDListener(server, 8888);
+			listener.start();
+		} catch (Exception e) {
+			fail("Creating listener caused Exception");
+		}
+    	
+    	String path = "/coconut-sample/_design/coconut/index.html";
+    	// setup clock
+        Calendar cal = new GregorianCalendar();
+        Date starttime = cal.getTime();
+        long long_starttime = starttime.getTime();
+    	Log.v(TAG, "Start page view" + starttime.toString());
+    	conn = Router.sendRequest(server, "GET", path, null, null);
+    	path = "/coconut-sample/_design/coconut/css/1140.css";
+    	conn = Router.sendRequest(server, "GET", path, null, null);
+    	path = "/coconut-sample/_design/coconut/css/ui-lightness/jquery-ui-1.8.15.custom.css";
+    	conn = Router.sendRequest(server, "GET", path, null, null);
+    	//Log.v(TAG, String.format("%s --> %d", path, conn.getResponseCode()));
+    	// Stop clock and calculate time elapsed
+        Calendar cal2 = new GregorianCalendar();
+        Date endtime = cal2.getTime();
+        long long_endtime = endtime.getTime();
+        long difference = (long_endtime - long_starttime);
+        float diffSecs = difference / 1000;
+		Log.v(TAG,"********  Time to fetch data: " + difference + " or " + diffSecs + " seconds ******");
+    	Map<String,Object> result;
+    	String output = (String) Router.parseJSONResponse(conn);
+    	db.close();
+    	server.close();
+    }
 }
